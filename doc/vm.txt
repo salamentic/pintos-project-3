@@ -206,6 +206,22 @@ If the stack pointer is not null, then the value stored in this pointer is going
 >> particular, explain how it prevents deadlock.  (Refer to the
 >> textbook for an explanation of the necessary conditions for
 >> deadlock.)
+  The way we do VM synchronization is through semaphores for every page that
+we use. This, allows for every page access (and through locks for the tables,
+table access) to be protected from race conditions at the cost of more
+complexity and risks of deadlocks. This though allows us to have a lot more
+parallelism and reliability on the kernel side. 
+  The way we prevent deadlocks in our design is a rather simple application of
+deadlock prevention that we learned in class. When a process owns a page, it
+does not prevent other processes from trying to access this page through page
+faults or other methods. Therefore, deadlocks are mostly prevented this way
+since the hold and wait clause is prevented in most cases. 
+  We do realize though there might be other ways a deadlock might take place
+and therefore the other consideration we were going to make was to have a
+single semaphore for the page table access. This we realized has a lot more
+disadvantages but might change to this if we find a case where we were
+mistaken and deadlocks do actually take place due to something we missed.
+  
 
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
@@ -215,7 +231,8 @@ If the stack pointer is not null, then the value stored in this pointer is going
 To ensure this, we simply add synchronization into the mix. For every page, we
 will add a semaphore entry in it's page table and therefore whenever it has to
 perform modifications to it's page, it has to down the semaphore before
-continuing. This with an initialization to 1, allows for the pages to be
+continuing (this method also works if we modify this to be a single semaphore
+for all page acceses). This with an initialization to 1, allows for the pages to be
 modified only by one process at a time. Therefore, during the eviction process
 no other process can touch this page in any way and thereby preventing that
 race condition.
@@ -228,6 +245,10 @@ the supplementary page table), and if not we just terminate the process or do
 not fault at all, since this would then technically be an invalid memory
 access as of now. We could also bring the page back in after the eviction,
 although that mich cause inefficiency that we might want to avoid.
+This whole process can also be simplified by changing the number of semaphores
+from one per page to just one globally, which might help with deadlock (at the
+cost of reduced parallelism) but does not change the functionality explained
+above in any manner.
 
 >> B8: Explain how you handle access to paged-out pages that occur
 >> during system calls.  Do you use page faults to bring in pages (as
@@ -272,6 +293,9 @@ deadlocks are created by us the designers), and therefore allows for enough
 safety that makes the usage of this system worth it. We feel that these
 advantages it provides over the rather primitive single lock mechanism make
 this a slightly risker but way,way more functional choice.
+  In the end though, if deadlocks become too much of an issue we might switch
+to the single lock method since our design is made such that we lose no
+functionality while making this switch.
 
 
 
@@ -286,12 +310,20 @@ the quarter.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
-
-We appreciate the reduced project length, as this time of year can be quite stressful, so the reduced workload is helpful.
+  I feel making the page table while not having any eviction process required
+is a little redundant, since the purpose of the frame table is close to none
+without eviction in play. 
+  The other functionality I think was fine and decently hard enough to
+implement.
+  Nevertheless, we appreciate the reduced project length, as this time of year can be quite stressful, so the reduced workload is helpful.
 The project seems rather reasonable to complete, the majority of the problems seem like they have more freedom in terms of implementation, which should make it more enjoyable.
 
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+  Yeah. I feel this gave me a better insight into the whole mechanism of
+paging and segmentation and how these structures can be implemented in actual
+OS design. It was a very good experience to actually have to implement these
+rather than just learn about them, as we do in a lot of other courses.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
@@ -305,3 +337,5 @@ The guidance given seems to be about the appropriate level to give. For previous
 If the reduced worklad of project 3 is kept in the future, it will be helpful to have the modified design doc & tests that need to be completed ahead of time, and make these available.This will be very helpful.
 
 >> Any other comments?
+In the future I would definitely come back to this project to work on the
+excluded parts and possibly the filesystems project too.
