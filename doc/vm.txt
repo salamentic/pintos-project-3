@@ -71,13 +71,13 @@ from our supplementary page table
 struct page * page_delete(const void * address) - Used to delete a page
 from our supplementary page table
 ---------------------------------------------------------
-static bool setup_stack (const char *cmd_line, void **esp)  - Modified to accomodate stack growth. Also modified it to use
+static bool setup_stack (const char *cmd_line, void **esp)  - Modified to accomadate stack growth. Also modified it to use
 our frame table and page table.
 
 static void page_fault (struct intr_frame *f) - Modified to allow for modified page faults based on our SPT
 
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes, uint32_t zero_bytes, bool writable)
-- Modified it to accomodate lazy loading, and also to accomodate our page table and frame table functionality. 
+- Modified it to accomadate lazy loading, and also to accomadate our page table and frame table functionality. 
 Most process.c functions will be modified to achieve the results required from
 the page and frame tables we make.
 
@@ -145,7 +145,7 @@ really know how to go about using those.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-int dirty - We add a drty bit to the frame struct in frame table.
+int dirty - We add a dirty bit to the frame struct in frame table.
 
 struct semaphore sema_page - A semaphore used to ensure synchronization in
 page table.
@@ -165,7 +165,7 @@ Our code for doing so is straightforward. The replacement algorithm we use
 frames is a simple (slightly modified) LIFO algorithm. 
 The first thing we do is set up iteration on the hash table. Once that is
 done, we go directly to the last element of our frame table and iterate
-backwards from there on. We then check wether or not the access bit for the
+backwards from there on. We then check whether or not the access bit for the
 page has been used. If it has, this makes the frame a possible victim for
 eviction. Then we check if the dirty bit has also been set. If it has, we
 simply evict the page out right away. If not, we check a certain number of
@@ -229,9 +229,9 @@ mistaken and deadlocks do actually take place due to something we missed.
 
 To ensure this, we simply add synchronization into the mix. For every page, we
 will add a semaphore entry in it's page table and therefore whenever it has to
-perform modifications to it's page, it has to down the semaphore before
+perform modifications to its page, it has to down the semaphore before
 continuing (this method also works if we modify this to be a single semaphore
-for all page acceses). This with an initialization to 1, allows for the pages to be
+for all page accesses). This with an initialization to 1, allows for the pages to be
 modified only by one process at a time. Therefore, during the eviction process
 no other process can touch this page in any way and thereby preventing that
 race condition.
@@ -281,7 +281,7 @@ address access.
 
 We considered using the single lock system but ended up going with an approach
 more towards multiple locks for synchronization. Although agreed, the
-possiblity of deadlocks exists by having a lock for every page access and for
+possibility of deadlocks exists by having a lock for every page access and for
 access to the frametable, it allows for way lesser race conditions and at the
 same time allows for our system to function much more reliably and quickly
 than in the case of a single lock, which would cause waits in cases where they
@@ -291,7 +291,7 @@ in most cases (Deadlock prevention in our case i.e ensuring no conditions for
 deadlocks are created by us the designers), and therefore allows for enough
 safety that makes the usage of this system worth it. We feel that these
 advantages it provides over the rather primitive single lock mechanism make
-this a slightly risker but way,way more functional choice.
+this a slightly riskier but way,way more functional choice.
   In the end though, if deadlocks become too much of an issue we might switch
 to the single lock method since our design is made such that we lose no
 functionality while making this switch.
@@ -328,12 +328,12 @@ rather than just learn about them, as we do in a lot of other courses.
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
 
-The guidance given seems to be about the appropriate level to give. For previous projets, it has felt like too much information has been given out, but I did not feel like this was the case for this project so far.
+The guidance given seems to be about the appropriate level to give. For previous projects, it has felt like too much information has been given out, but I did not feel like this was the case for this project so far.
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
 
-If the reduced worklad of project 3 is kept in the future, it will be helpful to have the modified design doc & tests that need to be completed ahead of time, and make these available.This will be very helpful.
+If the reduced workload of project 3 is kept in the future, it will be helpful to have the modified design doc & tests that need to be completed ahead of time, and make these available.This will be very helpful.
 
 >> Any other comments?
 In the future I would definitely come back to this project to work on the
