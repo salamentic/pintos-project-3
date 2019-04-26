@@ -1,0 +1,296 @@
+            +---------------------------+
+		    | CS 140                    |
+		    | PROJECT 3: VIRTUAL MEMORY	|
+		    | DESIGN DOCUMENT           |
+		    +---------------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+Aniruddh Rao <anrao3@buffalo.edu>
+FirstName LastName <email@domain.example>
+FirstName LastName <email@domain.example>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+			PAGE TABLE MANAGEMENT
+			=====================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+struct lock frametable - Lock for frametable access
+struct lock pagetable - Lock for pagetable access
+---------------------------------------------------------
+struct hash frametable - A hash  table used to store our frame data
+
+struct frame - A structure used to store frames in our hash table
+struct frame_elem - A list elem used to store frames in frametable
+struct void * faddr - Address of frame being looked for in the frame table,
+void * paddr - Address of the page in memory that currently occupies
+the given frame (rounded down)
+might be changed to uint8_t later
+int owner - Used to store owner of current frame
+
+unsigned frame_hash(const struct hash_elem * h, void * aux UNUSED) - Used to get hashed index for frame
+bool frame_less(const struct hash_elem * h,const struct hash_elem * y, void *
+aux UNUSED) - Function for less than.
+struct frame * frame_lookup(const void * address) - Used to lookup a frame
+from our frametable
+struct frame * frame_delete(const void * address) - Used to delete a frame
+from our frametable
+---------------------------------------------------------
+struct hash spt - Hash table for supplementary page table
+
+struct page - A structure used to  store pages in our page table
+struct list_elem page_elem - A list elem used to store pages in our
+supplementary page table
+void * paddr - Used to store the  virtual address of our page being
+stored
+void * data - Used to store the location of the data that should be installed
+into a page or removed from a page when required. This will be used to handle
+page faults. Will be changed to a int pointer possibly.
+void * stack - This might be the address of the stack pointer if any, for the
+page but might not be used since it mostly is the same as data.
+
+unsigned page_hash(const struct hash_elem * h, void * aux UNUSED) - Used to
+get hashed index for page
+bool page_less(const struct hash_elem * h,const struct hash_elem * y, void *
+aux UNUSED) - Function for less than.
+struct page * page_lookup(const void * address) - Used to lookup a page
+from our supplementary page table
+struct page * page_delete(const void * address) - Used to delete a page
+from our supplementary page table
+---------------------------------------------------------
+setup_stack() - Modified to accomodate stack growth. Also modified it to use
+our frame table and page table.
+
+page_fault() - Modified to allow for modified page faults based on our SPT
+
+load_segment() - Modified it to accomodate lazy loading, and also to
+accomodate our page table and frame table functionality. 
+
+Most process.c functions will be modified to achieve the results required from
+the page and frame tables we make.
+
+---- ALGORITHMS ----
+
+>> A2: In a few paragraphs, describe your code for accessing the data
+>> stored in the SPT about a given page.
+
+Our process to this is quite simple. We firstly used a hash table to have our
+SPT function, which allows for rather quick accesses at the cost of slower
+insertions and deletions. 
+When we perform an access to the SPT, the first thing we will need is the
+virtual address of the page table being looked for (or other identifier if we
+change it, the code is portable that way). This serves as the key for the hash
+table we used for our SPT. We then call hash_lookup with the address as the
+argument, which will then return us the corresponding page data we want from
+the SPT, in a struct called 'page'. For this we had to implement functions
+tthat allowed for hashing of the address and a function that compared two page
+addresses and told us which one is the lesser of the two. 
+
+---- SYNCHRONIZATION ----
+
+>> A4: When two user processes both need a new frame at the same time,
+>> how are races avoided?
+
+We have a global lock for the frame table we use. Whenever a process needs a
+new frame, they must necessarily add their entry to the frame table and
+therefore, before the frame is allocated we simply acquire a global lock
+(initialized to 1 in init.c). This way, whenever another process wishes to get
+a new frame, it must also acquire the same lock and therefore waits till the
+other frame has completed it's frame allocation before it can get it's own.
+Using this simple lock synchronization we avoid most, if not all, race
+conditions in one fell swoop.
+
+---- RATIONALE ----
+
+>> A5: Why did you choose the data structure(s) that you did for
+>> representing virtual-to-physical mappings?
+
+We used a hash table for out virtual-to-physical mappings. 
+We had multiple choices for the given problem at hand. One consideration we
+had in mind was simply an array, but the problems we had with it were that a
+lot of space in between elements is wasted as more elements are freed. This
+makes them a suboptimal data structure to use for us. 
+The second choice we considered were lists. This actually works pretty well
+memory-wise and provide extremely quick insertions and deletions, but the
+thing with this was that, the accesses would turn out to be extremely slow.
+For a problem as repetitive as virtual to physical mappings, we thought that
+access time should take priority and so dropped this structure. 
+Finally, we came to hash tables. These give us extremely fast accesses, access
+to robust data storage using structs and gives generally fast insertions and
+deletions except in case of hash collisions or an extremely large amount of
+deletions, which can be fixed by a rehash at a certain point equating to the
+same time as a single access using a list. This makes hash tables optimal for
+us. 
+We also considered bit vectors but these felt more useful and we did not
+really know how to go about using those.
+
+		       PAGING TO AND FROM DISK
+		       =======================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+int dirty - We add a drty bit to the frame struct in frame table.
+
+struct semaphore sema_page - A semaphore used to ensure synchronization in
+page table.
+
+int evicted - An int in the frame struct to show if the frame has been evicted
+or not.
+
+int paged_out - Used to see if this page is still in memory or not. In struct
+page/ in SPT.
+
+---- ALGORITHMS ----
+
+>> B2: When a frame is required but none is free, some frame must be
+>> evicted.  Describe your code for choosing a frame to evict.
+
+Our code for doing so is straightforward. The replacement algorithm we use
+frames is a simple (slightly modified) LIFO algorithm. 
+The first thing we do is set up iteration on the hash table. Once that is
+done, we go directly to the last element of our frame table and iterate
+backwards from there on. We then check wether or not the access bit for the
+page has been used. If it has, this makes the frame a possible victim for
+eviction. Then we check if the dirty bit has also been set. If it has, we
+simply evict the page out right away. If not, we check a certain number of
+pages (To save time) say , 5, under the given page and see if any of them have
+both their dirty and access bits set. If any has, then that page will be
+evicted right away and we stop iteration. 
+Eviction itself is rather simple since most of the process will probably be
+done in palloc_get_page. We simply remove the frame and then, allocate a new
+frame, and finally put it back into the frame table with the page it now
+holds, if any. We might change this to simply reuse the frame for this instead
+of actually letting go of it in the table.
+
+>> B3: When a process P obtains a frame that was previously used by a
+>> process Q, how do you adjust the page table (and any other data
+>> structures) to reflect the frame Q no longer has?
+
+When a process P obtains a frame that was previously, the process of changing
+this is quite simple. The first thing we do is we change the page that is
+being held in the given frame by installing proces P's own frame into the
+frame being used. Then we update the SPT to reflect the same for the frame.
+Then we finally update the frame table to point to the new page that is in it
+and also update the owner PID in the frame struct for the frametable. 
+Through this simple, succinct process we successfully hand over the frame from
+Q to P quite completely.
+
+>> B4: Explain your heuristic for deciding whether a page fault for an
+>> invalid virtual address should cause the stack to be extended into
+>> the page that faulted.
+
+---- SYNCHRONIZATION ----
+
+>> B5: Explain the basics of your VM synchronization design.  In
+>> particular, explain how it prevents deadlock.  (Refer to the
+>> textbook for an explanation of the necessary conditions for
+>> deadlock.)
+
+>> B6: A page fault in process P can cause another process Q's frame
+>> to be evicted.  How do you ensure that Q cannot access or modify
+>> the page during the eviction process?  How do you avoid a race
+>> between P evicting Q's frame and Q faulting the page back in?
+
+To ensure this, we simply add synchronization into the mix. For every page, we
+will add a semaphore entry in it's page table and therefore whenever it has to
+perform modifications to it's page, it has to down the semaphore before
+continuing. This with an initialization to 1, allows for the pages to be
+modified only by one process at a time. Therefore, during the eviction process
+no other process can touch this page in any way and thereby preventing that
+race condition.
+This also prevents Q faulting the page back in, because we must have the same
+synchronization taking place even then. Then, if Q wishes to fault the page
+back in after the eviction takes place, we can simply verify if the page is
+still in a frame (by using an evicted bit if we do not want to delete it from
+the supplementary page table), and if not we just terminate the process or do
+not fault at all, since this would then technically be an invalid memory
+access as of now. We could also bring the page back in after the eviction,
+although that mich cause inefficiency that we might want to avoid.
+
+>> B8: Explain how you handle access to paged-out pages that occur
+>> during system calls.  Do you use page faults to bring in pages (as
+>> in user programs), or do you have a mechanism for "locking" frames
+>> into physical memory, or do you use some other design?  How do you
+>> gracefully handle attempted accesses to invalid virtual addresses?
+
+We take the former option and use page faults to bring back in pages, since
+that allows for more functionality without having 'one-offs' of any kind. This
+allows us to treat paged-out paging as a proper invariant and case independent
+as much as possible. 
+We gracefully handle invalid virtual addresses by having a sufficient amount
+of checks in place to handle the given address. We first check in the SPT if
+the address being accessed is a valid one at all, and if it is we check if it
+had already been evicted earlier. If it has, we handle it based on our page
+fault process which we have explained earlier in the document (Installing a
+new set of data into a frame using the data pointer in the SPT for the given
+frame). If the page was not in the SPT, we check again in the frame table to
+make sure that we are not facing any error of kinds, and then finally
+terminate the process since then the access is an invalid invalid virtual
+address access. 
+
+---- RATIONALE ----
+
+>> B9: A single lock for the whole VM system would make
+>> synchronization easy, but limit parallelism.  On the other hand,
+>> using many locks complicates synchronization and raises the
+>> possibility for deadlock but allows for high parallelism.  Explain
+>> where your design falls along this continuum and why you chose to
+>> design it this way.
+
+We considered using the single lock system but ended up going with an approach
+more towards multiple locks for synchronization. Although agreed, the
+possiblity of deadlocks exists by having a lock for every page access and for
+access to the frametable, it allows for way lesser race conditions and at the
+same time allows for our system to function much more reliably and quickly
+than in the case of a single lock, which would cause waits in cases where they
+should not be an issue (frame access waiting for a frame access or frame
+rehash, as an example). We feel that we have mechanisms to prevent deadlocks
+in most cases (Deadlock prevention in our case i.e ensuring no conditions for
+deadlocks are created by us the designers), and therefore allows for enough
+safety that makes the usage of this system worth it. We feel that these
+advantages it provides over the rather primitive single lock mechanism make
+this a slightly risker but way,way more functional choice.
+
+
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
