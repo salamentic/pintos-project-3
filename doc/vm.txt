@@ -9,8 +9,7 @@
 >> Fill in the names and email addresses of your group members.
 
 Aniruddh Rao <anrao3@buffalo.edu>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Aaron Wilson <ajw43@buffalo.edu>
 
 ---- PRELIMINARIES ----
 
@@ -218,7 +217,8 @@ no other process can touch this page in any way and thereby preventing that
 race condition.
 This also prevents Q faulting the page back in, because we must have the same
 synchronization taking place even then. Then, if Q wishes to fault the page
-back in after the eviction takes place, we can simply verify if the page is
+back in after the eviction takes place, we can simply 
+if the page is
 still in a frame (by using an evicted bit if we do not want to delete it from
 the supplementary page table), and if not we just terminate the process or do
 not fault at all, since this would then technically be an invalid memory
@@ -283,6 +283,9 @@ the quarter.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+We appreciate the reduced project length, as this time of year can be quite stressful, so the reduced workload is helpful.
+The project seems rather reasonable to complete, the majority of the problems seem like they have more freedom in terms of implementation, which should make it more enjoyable.
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
 
@@ -290,7 +293,11 @@ the quarter.
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
 
+The guidance given seems to be about the appropriate level to give. For previous projets, it has felt like too much information has been given out, but I did not feel like this was the case for this project so far.
+
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
+
+If the reduced worklad of project 3 is kept in the future, it will be helpful to have the modified design doc & tests that need to be completed ahead of time, and make these available.This will be very helpful.
 
 >> Any other comments?
