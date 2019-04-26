@@ -71,14 +71,13 @@ from our supplementary page table
 struct page * page_delete(const void * address) - Used to delete a page
 from our supplementary page table
 ---------------------------------------------------------
-setup_stack() - Modified to accomodate stack growth. Also modified it to use
+static bool setup_stack (const char *cmd_line, void **esp)  - Modified to accomodate stack growth. Also modified it to use
 our frame table and page table.
 
-page_fault() - Modified to allow for modified page faults based on our SPT
+static void page_fault (struct intr_frame *f) - Modified to allow for modified page faults based on our SPT
 
-load_segment() - Modified it to accomodate lazy loading, and also to
-accomodate our page table and frame table functionality. 
-
+static bool load_segment (struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes, uint32_t zero_bytes, bool writable)
+- Modified it to accomodate lazy loading, and also to accomodate our page table and frame table functionality. 
 Most process.c functions will be modified to achieve the results required from
 the page and frame tables we make.
 
