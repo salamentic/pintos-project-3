@@ -59,8 +59,8 @@ stored
 void * data - Used to store the location of the data that should be installed
 into a page or removed from a page when required. This will be used to handle
 page faults. Will be changed to a int pointer possibly.
-void * stack - This might be the address of the stack pointer if any, for the
-page but might not be used since it mostly is the same as data.
+void * stack - This will be the address of the stack pointer for the
+page, if any. This is initialized to null, and is also used as a heuristic to say whether this page holds part of the stack or not.
 
 unsigned page_hash(const struct hash_elem * h, void * aux UNUSED) - Used to
 get hashed index for page
@@ -195,6 +195,10 @@ Q to P quite completely.
 >> B4: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
 >> the page that faulted.
+
+The heuristic we developed for this purpose is a pointed for every element in the struct hash SPT, which is a supplementary page table. When this value is null, that indicates that the page being accessed is not a stack access, and therefore we should go through the normal page_fault procedure. If it is not in the SPT at all, we treat it as an invalid invalid virtual access.
+
+If the stack pointer is not null, then the value stored in this pointer is going be the current position of the esp, indicating that this is a stack access. Before we do this, we run this address up or down, to ensure that we can check for a page. We can later add a check where we might see if the esp currently is not in the current page, and redirect the page fault into that page. For the scope of this question, we believe we do not have to explain this.
 
 ---- SYNCHRONIZATION ----
 
