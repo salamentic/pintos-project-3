@@ -220,6 +220,7 @@ process_activate (void)
   /* Set thread's kernel stack for use in processing
      interrupts. */
   tss_update ();
+  page_init (&t->supptable);
 }
 
 /* We load ELF binaries.  The following definitions are taken
@@ -287,9 +288,9 @@ struct Elf32_Phdr
 
 static bool setup_stack (const char *cmd_line, void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
-                          uint32_t read_bytes, uint32_t zero_bytes,
-                          bool writable);
+//static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+//                          uint32_t read_bytes, uint32_t zero_bytes,
+//                          bool writable);
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -392,9 +393,21 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
+      struct page * mypage = malloc(sizeof(struct page));
+      mypage->paddr = (void *) mem_page;
+      mypage->data = file;
+      mypage->stack = NULL;
+      mypage->offset = file_page;
+      mypage->bytes = read_bytes;
+      mypage->zero = zero_bytes;
+      mypage->write= writable;
+
+      hash_insert(&thread_current()->supptable, &mypage->hash_elem);
+/*
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
+*/
             }
           else
             goto done;
@@ -479,7 +492,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
-static bool
+bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
 {
@@ -498,23 +511,30 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
       uint8_t *kpage = palloc_get_page (PAL_USER);
+      struct frame * temp = malloc(sizeof(struct frame));
+      temp->faddr = kpage;
       if (kpage == NULL)
         return false;
 
-      /* Load this page. */
+ //      Load this page. 
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
+   	  free(temp);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
+      // Add the page to the process's address space. 
       if (!install_page (upage, kpage, writable)) 
         {
           palloc_free_page (kpage);
+   	  free(temp);
           return false; 
         }
+
+      temp->paddr = upage;
+      hash_insert(&frametable, &temp->hash_elem);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -594,6 +614,7 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
   argv = (char **) (upage + ofs);
   reverse (argc, (char **) (kpage + ofs));
 
+
   /* Push argv, argc, "return address". */
   if (push (kpage, &ofs, &argv, sizeof argv) == NULL
       || push (kpage, &ofs, &argc, sizeof argc) == NULL
@@ -601,6 +622,14 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
     return false;
 
   /* Set initial stack pointer. */
+
+  struct page * mypage = malloc(sizeof(struct page));
+  mypage->paddr = upage;
+  mypage->data = kpage;
+  mypage->stack = esp;
+  mypage->bytes = ofs;
+  hash_insert(&thread_current()->supptable, &mypage->hash_elem);
+
   *esp = upage + ofs;
   return true;
 }
@@ -616,13 +645,18 @@ setup_stack (const char *cmd_line, void **esp)
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
+  {
+    uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+    if (install_page (upage, kpage, true))
     {
-      uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-      if (install_page (upage, kpage, true))
+//        struct frame * temp = malloc(sizeof(struct frame));
+//        temp->faddr = kpage;
+//        temp->paddr = upage;
         success = init_cmd_line (kpage, upage, cmd_line, esp);
-      else
-        palloc_free_page (kpage);
     }
+    else
+        palloc_free_page (kpage);
+  }
   return success;
 }
 

@@ -105,6 +105,7 @@ main (void)
   gdt_init ();
 #endif
 
+  frame_init();
   /* Initialize interrupt handlers. */
   intr_init ();
   timer_init ();

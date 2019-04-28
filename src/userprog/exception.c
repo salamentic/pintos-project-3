@@ -4,12 +4,34 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/palloc.h"
+#include "userprog/process.h"
+#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+
+void *
+safe_acc(const void * f)
+{
+  if(f==NULL)
+  {
+    thread_exit();
+    return NULL;
+  }
+
+  if(is_user_vaddr(f))
+  {
+    return f;
+  }
+
+  thread_exit();
+
+  return NULL;
+}
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -156,14 +178,23 @@ page_fault (struct intr_frame *f)
       return;
     }
 
+  //void * upage = pg_round_down(fault_addr);
+  void * upage = pg_round_down(fault_addr);
+  struct page * mypage = page_lookup(&thread_current()->supptable, upage);
+  safe_acc(upage);
+  void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
+  load_segment(mypage->data, mypage->offset,upage, mypage->bytes, mypage->zero, mypage->write);
+
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
+  /*printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
+*/
+ 
 }
 
