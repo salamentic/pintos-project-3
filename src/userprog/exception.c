@@ -182,8 +182,16 @@ page_fault (struct intr_frame *f)
   void * upage = pg_round_down(fault_addr);
   struct page * mypage = page_lookup(&thread_current()->supptable, upage);
   safe_acc(upage);
+  if(mypage!=NULL)
+  {
   void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
   load_segment(mypage->data, mypage->offset,upage, mypage->bytes, mypage->zero, mypage->write);
+  }
+  else
+  {
+    void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
+    pagedir_set_page(thread_current()->pagedir, upage, kpage, true);
+  }
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
