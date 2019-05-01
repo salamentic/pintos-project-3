@@ -220,7 +220,6 @@ process_activate (void)
   /* Set thread's kernel stack for use in processing
      interrupts. */
   tss_update ();
-  page_init (&t->supptable);
 }
 
 /* We load ELF binaries.  The following definitions are taken
@@ -310,6 +309,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
+  page_init (&thread_current()->supptable);
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
@@ -393,21 +393,9 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
-      struct page * mypage = malloc(sizeof(struct page));
-      mypage->paddr = (void *) mem_page;
-      mypage->data = file;
-      mypage->stack = NULL;
-      mypage->offset = file_page;
-      mypage->bytes = read_bytes;
-      mypage->zero = zero_bytes;
-      mypage->write= writable;
-
-      hash_insert(&thread_current()->supptable, &mypage->hash_elem);
-/*
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
-*/
             }
           else
             goto done;
@@ -500,7 +488,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -510,14 +497,20 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      struct frame * temp = malloc(sizeof(struct frame));
-      temp->faddr = kpage;
-      if (kpage == NULL)
-        return false;
+      struct page * mypage = malloc(sizeof(struct page));
+      mypage->paddr = (void *) upage;
+      mypage->data = file;
+      mypage->stack = NULL;
+      mypage->offset = ofs;
+      mypage->bytes = page_read_bytes;
+      mypage->zero = page_zero_bytes;
+      mypage->write= writable;
+
+      hash_insert(&thread_current()->supptable, &mypage->hash_elem);
 
  //      Load this page. 
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+     /* if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      uint8_t *kpage = palloc_get_page (PAL_USER);
         {
           palloc_free_page (kpage);
    	  free(temp);
@@ -531,15 +524,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           palloc_free_page (kpage);
    	  free(temp);
           return false; 
-        }
+        }*/
 
-      temp->paddr = upage;
-      hash_insert(&frametable, &temp->hash_elem);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      ofs += page_read_bytes;
     }
   return true;
 }

@@ -19,18 +19,20 @@ safe_acc(const void * f)
 {
   if(f==NULL)
   {
-    thread_exit();
-    return NULL;
+	return NULL;
   }
 
-  if(is_user_vaddr(f))
+  if(!is_user_vaddr(f))
   {
-    return f;
+	return NULL;
   }
 
-  thread_exit();
+  if(f < 0x08048000)
+  {
+	return NULL;
+  }
 
-  return NULL;
+  return f;
 }
 
 /* Registers handlers for interrupts that can be caused by user
@@ -179,23 +181,33 @@ page_fault (struct intr_frame *f)
     }
 
   //void * upage = pg_round_down(fault_addr);
+  if(safe_acc(fault_addr) == NULL)
+{
+	kill(f);
+	return;
+}
   void * upage = pg_round_down(fault_addr);
   struct page * mypage = page_lookup(&thread_current()->supptable, upage);
-  safe_acc(upage);
-  if(mypage!=NULL)
-  {
   void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
-  load_segment(mypage->data, mypage->offset,upage, mypage->bytes, mypage->zero, mypage->write);
-  }
-  else
-  {
-    void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
-    pagedir_set_page(thread_current()->pagedir, upage, kpage, true);
-  }
 
+  if(mypage != NULL)
+  {
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
+      int back = file_tell(mypage->data);
+      file_seek(mypage->data, mypage->offset);
+      file_read (mypage->data, kpage, mypage->bytes); 
+      memset (kpage + mypage->bytes, 0, mypage->zero);
+      pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
+      file_seek(mypage->data, 0);
+  }
+  else
+  {
+      pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+  }
+
+      // Add the page to the process's address space. 
   /*printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
