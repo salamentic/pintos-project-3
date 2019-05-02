@@ -190,12 +190,11 @@ page_fault (struct intr_frame *f)
   struct page * mypage = page_lookup(&thread_current()->supptable, upage);
   void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
 
-  if(mypage != NULL)
+  if(mypage != NULL && mypage->stack == NULL)
   {
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-      int back = file_tell(mypage->data);
       file_seek(mypage->data, mypage->offset);
       file_read (mypage->data, kpage, mypage->bytes); 
       memset (kpage + mypage->bytes, 0, mypage->zero);
