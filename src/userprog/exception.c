@@ -175,6 +175,13 @@ page_fault (struct intr_frame *f)
   /* Handle bad dereferences from system call implementations. */
   if (!user) 
     {
+      if(safe_acc(fault_addr) != NULL  && (fault_addr < (uint32_t * ) f->esp+1 && fault_addr < (uint32_t * ) f->esp-1 ))
+      {
+  void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
+        void * upage = pg_round_down(fault_addr);
+        pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+	return;
+      }
       f->eip = (void (*) (void)) f->eax;
       f->eax = 0;
       return;
