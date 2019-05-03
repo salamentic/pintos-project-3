@@ -203,7 +203,10 @@ page_fault (struct intr_frame *f)
   }
   else
   {
+      if(fault_addr >= ((uint32_t *) f->esp)-8) 
       pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+	else
+	kill(f);
   }
 
       // Add the page to the process's address space. 
