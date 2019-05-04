@@ -310,7 +310,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
-  page_init (&thread_current()->supptable);
+  //page_init (&thread_current()->supptable);
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
@@ -507,7 +507,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       mypage->zero = page_zero_bytes;
       mypage->write= writable;
 
+      sema_down(&thread_current()->hash_sema);
       hash_insert(&thread_current()->supptable, &mypage->hash_elem);
+      sema_up(&thread_current()->hash_sema);
 
  //      Load this page. 
      /* if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)

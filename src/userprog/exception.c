@@ -173,6 +173,7 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   /* Handle bad dereferences from system call implementations. */
+
   if (!user) 
     {
       f->eip = (void (*) (void)) f->eax;
@@ -198,7 +199,8 @@ page_fault (struct intr_frame *f)
       file_seek(mypage->data, mypage->offset);
       file_read (mypage->data, kpage, mypage->bytes); 
       memset (kpage + mypage->bytes, 0, mypage->zero);
-      pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
+      if(pagedir_get_page (thread_current()->pagedir, upage) == NULL)
+        pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
       file_seek(mypage->data, 0);
       page_delete (&thread_current()->supptable, upage);
   }

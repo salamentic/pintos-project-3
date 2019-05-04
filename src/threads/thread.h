@@ -118,6 +118,7 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct hash supptable;
+    struct semaphore hash_sema;
 #endif
     struct file *bin_file;              /* Executable. */
 
