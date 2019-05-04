@@ -97,8 +97,8 @@ syscall_handler (struct intr_frame *f)
 static bool
 verify_user (const void *uaddr) 
 {
-  return (uaddr < PHYS_BASE
-          && pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
+  return (uaddr < PHYS_BASE);
+ //         && pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
 }
  
 /* Copies a byte from user address USRC to kernel address DST.

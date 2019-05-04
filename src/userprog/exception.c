@@ -6,6 +6,7 @@
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 #include "threads/vaddr.h"
 
 /* Number of page faults processed. */
@@ -176,6 +177,41 @@ page_fault (struct intr_frame *f)
 
   if (!user) 
     {
+  void * upage = pg_round_down(fault_addr);
+  struct page * mypage = page_lookup(&thread_current()->supptable, upage);
+  void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
+
+  if(safe_acc(fault_addr) == NULL)
+{
+      f->eip = (void (*) (void)) f->eax;
+      f->eax = 0;
+	return;
+}
+  if(mypage != NULL && mypage->stack == NULL)
+  {
+  /* To implement virtual memory, delete the rest of the function
+     body, and replace it with code that brings in the page to
+     which fault_addr refers. */
+      file_seek(mypage->data, mypage->offset);
+      file_read (mypage->data, kpage, mypage->bytes); 
+      memset (kpage + mypage->bytes, 0, mypage->zero);
+      if(pagedir_get_page (thread_current()->pagedir, upage) == NULL)
+        pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
+      file_seek(mypage->data, 0);
+      page_delete (&thread_current()->supptable, upage);
+      return;
+  }
+  else
+  {
+      if(fault_addr >= ((uint32_t *) f->esp)-8) 
+      pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+      else {
+      f->eip = (void (*) (void)) f->eax;
+      f->eax = 0;
+      }
+	return;
+      return;
+  }
       f->eip = (void (*) (void)) f->eax;
       f->eax = 0;
       return;
