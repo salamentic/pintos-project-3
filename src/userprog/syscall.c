@@ -33,7 +33,6 @@ static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
  
 /* Serializes file system operations. */
-static struct lock fs_lock;
  
 void
 syscall_init (void) 
@@ -331,6 +330,7 @@ sys_read (int handle, void *udst_, unsigned size)
 
   /* Handle all other reads. */
   fd = lookup_fd (handle);
+  if(!lock_held_by_current_thread(&fs_lock));
   lock_acquire (&fs_lock);
   while (size > 0) 
     {
@@ -478,6 +478,7 @@ syscall_exit (void)
       struct file_descriptor *fd;
       fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
+      if(!lock_held_by_current_thread(&fs_lock))
       lock_acquire (&fs_lock);
       file_close (fd->file);
       lock_release (&fs_lock);
