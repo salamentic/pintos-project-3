@@ -201,15 +201,12 @@ page_fault (struct intr_frame *f)
   }
   else
   {
-      if(fault_addr >= ((uint32_t *) f->esp)-8 &&fault_addr <= ((uint32_t *) f->esp)+8) 
+      if(thread_current()->esp - 8 <= fault_addr)      
+      {
         pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
-      else {
-      f->eip = (void (*) (void)) f->eax;
-      f->eax = 0;
+       // f->esp = fault_addr; 
+        return;
       }
-      if(mypage != NULL)
-        page_delete (&thread_current()->supptable, upage);
-      return;
   }
       f->eip = (void (*) (void)) f->eax;
       f->eax = 0;
@@ -242,7 +239,9 @@ page_fault (struct intr_frame *f)
   else
   {
       if(fault_addr >= ((uint32_t *) f->esp)-8) 
+{
       pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+}
 	else
 	kill(f);
   }

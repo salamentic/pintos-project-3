@@ -119,6 +119,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct hash supptable;
     struct semaphore hash_sema;
+    void * esp;
 #endif
     struct file *bin_file;              /* Executable. */
 

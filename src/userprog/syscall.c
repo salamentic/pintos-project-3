@@ -31,6 +31,7 @@ static int sys_close (int handle);
  
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
+static struct lock fs_lock;
  
 /* Serializes file system operations. */
  
@@ -81,11 +82,15 @@ syscall_handler (struct intr_frame *f)
   if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
     thread_exit ();
   sc = syscall_table + call_nr;
+          
+
 
   /* Get the system call arguments. */
   ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
   memset (args, 0, sizeof args);
   copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
+  thread_current()->esp = f->esp;
+
 
   /* Execute the system call,
      and set the return value. */
