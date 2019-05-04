@@ -97,6 +97,13 @@ syscall_handler (struct intr_frame *f)
 static bool
 verify_user (const void *uaddr) 
 {
+  return (uaddr < PHYS_BASE
+          && pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
+}
+
+static bool
+verify_user2 (const void *uaddr) 
+{
   return (uaddr < PHYS_BASE);
  //         && pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
 }
@@ -340,7 +347,7 @@ sys_read (int handle, void *udst_, unsigned size)
       off_t retval;
 
       /* Check that touching this page is okay. */
-      if (!verify_user (udst)) 
+      if (!verify_user2 (udst)) 
         {
           lock_release (&fs_lock);
           thread_exit ();
