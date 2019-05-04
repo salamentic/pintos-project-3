@@ -25,6 +25,16 @@ page_lookup (struct hash * supptable,  const void * address)
   return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
 }
 
+bool
+page_delete (struct hash * supptable,  const void * address)
+{
+  struct page h;
+  struct hash_elem *e;
+  h.paddr = address;
+  e = hash_delete(supptable, &h.hash_elem);
+  return e;
+}
+
 void
 page_init (struct hash * supptable)
 {

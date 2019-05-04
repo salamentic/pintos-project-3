@@ -26,3 +26,6 @@ page_lookup (struct hash * supptable,  const void * address);
 
 void
 page_init (struct hash * supptable);
+
+bool
+page_delete (struct hash * supptable,  const void * address);

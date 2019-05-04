@@ -200,6 +200,7 @@ page_fault (struct intr_frame *f)
       memset (kpage + mypage->bytes, 0, mypage->zero);
       pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
       file_seek(mypage->data, 0);
+      page_delete (&thread_current()->supptable, upage);
   }
   else
   {
