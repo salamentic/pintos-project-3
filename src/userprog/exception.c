@@ -208,6 +208,7 @@ page_fault (struct intr_frame *f)
         return;
       }
   }
+      thread_exit();
       f->eip = (void (*) (void)) f->eax;
       f->eax = 0;
       return;
