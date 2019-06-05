@@ -234,6 +234,8 @@ thread_create (const char *name, int priority,
   tid = t->tid = allocate_tid ();
   t->nice = cur->nice;
   t->recent_cpu = cur->recent_cpu;
+  page_init (&t->supptable);
+  sema_init(&t->hash_sema,1);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);

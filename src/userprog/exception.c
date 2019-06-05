@@ -4,12 +4,37 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/palloc.h"
+#include "userprog/process.h"
+#include "userprog/syscall.h"
+#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+
+void *
+safe_acc(const void * f)
+{
+  if(f==NULL)
+  {
+	return NULL;
+  }
+
+  if(!is_user_vaddr(f))
+  {
+	return NULL;
+  }
+
+  if(f < 0x08048000)
+  {
+	return NULL;
+  }
+
+  return f;
+}
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -149,21 +174,87 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   /* Handle bad dereferences from system call implementations. */
+
   if (!user) 
     {
+
+  if(safe_acc(fault_addr) == NULL)
+{
+      f->eip = (void (*) (void)) f->eax;
+      f->eax = 0;
+	return;
+}
+  void * upage = pg_round_down(fault_addr);
+  struct page * mypage = page_lookup(&thread_current()->supptable, upage);
+  void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
+
+  if(mypage != NULL && mypage->stack == NULL)
+  {
+      file_seek(mypage->data, mypage->offset);
+      file_read (mypage->data, kpage, mypage->bytes); 
+      memset (kpage + mypage->bytes, 0, mypage->zero);
+      if(pagedir_get_page (thread_current()->pagedir, upage) == NULL)
+        pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
+      file_seek(mypage->data, 0);
+      page_delete (&thread_current()->supptable, upage);
+      return;
+  }
+  else
+  {
+      if(thread_current()->esp - 8 <= fault_addr)      
+      {
+        pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+       // f->esp = fault_addr; 
+        return;
+      }
+  }
+      thread_exit();
       f->eip = (void (*) (void)) f->eax;
       f->eax = 0;
       return;
-    }
+  }
 
+  //void * upage = pg_round_down(fault_addr);
+  if(safe_acc(fault_addr) == NULL)
+{
+	kill(f);
+	return;
+}
+  void * upage = pg_round_down(fault_addr);
+  struct page * mypage = page_lookup(&thread_current()->supptable, upage);
+  void * kpage = (void * )  palloc_get_page(PAL_USER | PAL_ZERO);  
+
+  if(mypage != NULL && mypage->stack == NULL)
+  {
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
+      file_seek(mypage->data, mypage->offset);
+      file_read (mypage->data, kpage, mypage->bytes); 
+      memset (kpage + mypage->bytes, 0, mypage->zero);
+      if(pagedir_get_page (thread_current()->pagedir, upage) == NULL)
+        pagedir_set_page (thread_current()->pagedir, upage, kpage, mypage->write);
+      file_seek(mypage->data, 0);
+      page_delete (&thread_current()->supptable, upage);
+  }
+  else
+  {
+      if(fault_addr >= ((uint32_t *) f->esp)-8) 
+{
+      pagedir_set_page (thread_current()->pagedir, upage, kpage, write);
+}
+	else
+	kill(f);
+  }
+
+      // Add the page to the process's address space. 
+  /*printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
+*/
+ 
 }
 

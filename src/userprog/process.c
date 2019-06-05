@@ -7,6 +7,7 @@
 #include <string.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
@@ -287,9 +288,9 @@ struct Elf32_Phdr
 
 static bool setup_stack (const char *cmd_line, void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
-                          uint32_t read_bytes, uint32_t zero_bytes,
-                          bool writable);
+//static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+//                          uint32_t read_bytes, uint32_t zero_bytes,
+//                          bool writable);
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -309,6 +310,7 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
+  //page_init (&thread_current()->supptable);
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
@@ -479,7 +481,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
-static bool
+bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
 {
@@ -487,7 +489,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -497,29 +498,43 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
+      struct page * mypage = malloc(sizeof(struct page));
+      mypage->paddr = (void *) upage;
+      mypage->data = file;
+      mypage->stack = NULL;
+      mypage->offset = ofs;
+      mypage->bytes = page_read_bytes;
+      mypage->zero = page_zero_bytes;
+      mypage->write= writable;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      sema_down(&thread_current()->hash_sema);
+      hash_insert(&thread_current()->supptable, &mypage->hash_elem);
+      sema_up(&thread_current()->hash_sema);
+
+ //      Load this page. 
+     /* if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      uint8_t *kpage = palloc_get_page (PAL_USER);
         {
           palloc_free_page (kpage);
+   	  free(temp);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
+      // Add the page to the process's address space. 
       if (!install_page (upage, kpage, writable)) 
         {
           palloc_free_page (kpage);
+   	  free(temp);
           return false; 
-        }
+        }*/
+
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      ofs += page_read_bytes;
     }
   return true;
 }
@@ -594,6 +609,7 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
   argv = (char **) (upage + ofs);
   reverse (argc, (char **) (kpage + ofs));
 
+
   /* Push argv, argc, "return address". */
   if (push (kpage, &ofs, &argv, sizeof argv) == NULL
       || push (kpage, &ofs, &argc, sizeof argc) == NULL
@@ -601,6 +617,14 @@ init_cmd_line (uint8_t *kpage, uint8_t *upage, const char *cmd_line,
     return false;
 
   /* Set initial stack pointer. */
+
+  struct page * mypage = malloc(sizeof(struct page));
+  mypage->paddr = upage;
+  mypage->data = kpage;
+  mypage->stack = esp;
+  mypage->bytes = ofs;
+  hash_insert(&thread_current()->supptable, &mypage->hash_elem);
+
   *esp = upage + ofs;
   return true;
 }
@@ -616,13 +640,18 @@ setup_stack (const char *cmd_line, void **esp)
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
+  {
+    uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+    if (install_page (upage, kpage, true))
     {
-      uint8_t *upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-      if (install_page (upage, kpage, true))
+//        struct frame * temp = malloc(sizeof(struct frame));
+//        temp->faddr = kpage;
+//        temp->paddr = upage;
         success = init_cmd_line (kpage, upage, cmd_line, esp);
-      else
-        palloc_free_page (kpage);
     }
+    else
+        palloc_free_page (kpage);
+  }
   return success;
 }
 

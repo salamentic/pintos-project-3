@@ -31,9 +31,9 @@ static int sys_close (int handle);
  
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
+static struct lock fs_lock;
  
 /* Serializes file system operations. */
-static struct lock fs_lock;
  
 void
 syscall_init (void) 
@@ -82,11 +82,15 @@ syscall_handler (struct intr_frame *f)
   if (call_nr >= sizeof syscall_table / sizeof *syscall_table)
     thread_exit ();
   sc = syscall_table + call_nr;
+          
+
 
   /* Get the system call arguments. */
   ASSERT (sc->arg_cnt <= sizeof args / sizeof *args);
   memset (args, 0, sizeof args);
   copy_in (args, (uint32_t *) f->esp + 1, sizeof *args * sc->arg_cnt);
+  thread_current()->esp = f->esp;
+
 
   /* Execute the system call,
      and set the return value. */
@@ -100,6 +104,13 @@ verify_user (const void *uaddr)
 {
   return (uaddr < PHYS_BASE
           && pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
+}
+
+static bool
+verify_user2 (const void *uaddr) 
+{
+  return (uaddr < PHYS_BASE);
+ //         && pagedir_get_page (thread_current ()->pagedir, uaddr) != NULL);
 }
  
 /* Copies a byte from user address USRC to kernel address DST.
@@ -331,6 +342,7 @@ sys_read (int handle, void *udst_, unsigned size)
 
   /* Handle all other reads. */
   fd = lookup_fd (handle);
+  if(!lock_held_by_current_thread(&fs_lock));
   lock_acquire (&fs_lock);
   while (size > 0) 
     {
@@ -340,7 +352,7 @@ sys_read (int handle, void *udst_, unsigned size)
       off_t retval;
 
       /* Check that touching this page is okay. */
-      if (!verify_user (udst)) 
+      if (!verify_user2 (udst)) 
         {
           lock_release (&fs_lock);
           thread_exit ();
@@ -478,6 +490,7 @@ syscall_exit (void)
       struct file_descriptor *fd;
       fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
+      if(!lock_held_by_current_thread(&fs_lock))
       lock_acquire (&fs_lock);
       file_close (fd->file);
       lock_release (&fs_lock);
